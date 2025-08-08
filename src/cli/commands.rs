@@ -17,7 +17,7 @@ fn auto_write_code(text: &str, settings: &Settings, lang_hint: Option<&str>) -> 
     if blocks.is_empty() { return Ok(()); }
     let dir = settings.output_dir.as_deref().unwrap_or("generated");
     std::fs::create_dir_all(dir)?;
-    if blocks.len() == 1 {
+    if blocks.len() == 1 || !settings.auto_code_multi_write {
         let b = &blocks[0];
         let filename = b.filename.clone().unwrap_or_else(|| {
             let ext = b.language.as_deref().or(lang_hint).map(guess_ext_from_lang).unwrap_or("txt");
@@ -27,19 +27,8 @@ fn auto_write_code(text: &str, settings: &Settings, lang_hint: Option<&str>) -> 
         std::fs::write(&path, &b.content)?;
         eprintln!("Saved code to {}", path.display());
     } else {
-        if let Some(lang) = lang_hint {
-            if let Some(b) = choose_best_block(&blocks, &[lang]) {
-                let filename = b.filename.clone().unwrap_or_else(|| {
-                    let ext = b.language.as_deref().or(Some(lang)).map(guess_ext_from_lang).unwrap_or("txt");
-                    format!("snippet.{}", ext)
-                });
-                let path = std::path::Path::new(dir).join(filename);
-                std::fs::write(&path, &b.content)?;
-                eprintln!("Saved code to {}", path.display());
-                return Ok(());
-            }
-        }
-        for (idx, b) in blocks.iter().enumerate() {
+        let limit = settings.max_auto_blocks.max(1);
+        for (idx, b) in blocks.iter().take(limit).enumerate() {
             let filename = b.filename.clone().unwrap_or_else(|| {
                 let ext = b.language.as_deref().map(guess_ext_from_lang).unwrap_or("txt");
                 format!("snippet_{}.{}", idx + 1, ext)
@@ -47,7 +36,7 @@ fn auto_write_code(text: &str, settings: &Settings, lang_hint: Option<&str>) -> 
             let path = std::path::Path::new(dir).join(filename);
             std::fs::write(&path, &b.content)?;
         }
-        eprintln!("Saved {} code blocks to {}", blocks.len(), dir);
+        eprintln!("Saved up to {} code blocks to {}", limit, dir);
     }
     Ok(())
 }

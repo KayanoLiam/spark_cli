@@ -20,6 +20,10 @@ pub struct Settings {
     pub auto_code_write: bool,
     /// Default directory for auto-written code (relative to project root)
     pub output_dir: Option<String>,
+    /// When multiple code blocks exist, allow writing all (default: false)
+    pub auto_code_multi_write: bool,
+    /// Upper bound on blocks to write when multi-write is enabled
+    pub max_auto_blocks: usize,
 }
 
 impl Default for Settings {
@@ -31,6 +35,8 @@ impl Default for Settings {
             base_url: None,
             auto_code_write: true,
             output_dir: Some("generated".to_string()),
+            auto_code_multi_write: false,
+            max_auto_blocks: 10,
         }
     }
 }
