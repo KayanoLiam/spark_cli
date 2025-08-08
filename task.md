@@ -89,7 +89,7 @@ mycli code optimize --file src/lib.rs
 
 ### 3. 配置系统
 - 支持配置文件 (TOML/YAML)
-- 环境变量覆盖
+- 环境变量覆盖（部分：OPENROUTER_API_KEY 已支持）
 - 用户级和项目级配置
 - API 密钥安全存储
 
@@ -130,7 +130,7 @@ mycli code optimize --file src/lib.rs
 - [x] 实现基础的 HTTP 客户端
 
 ### Phase 2: 核心功能
-- [ ] 实现 API 交互逻辑
+- [x] 实现 API 交互逻辑（OpenRouter 文本对话）
 - [x] 添加多个 AI 服务提供商支持（已接入 OpenRouter）
 - [ ] 实现会话管理
 - [ ] 添加文件 I/O 功能

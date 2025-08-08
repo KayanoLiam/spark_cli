@@ -11,13 +11,16 @@ const CONFIG_FILE_NAME: &str = "config.toml";
 pub struct Settings {
     pub provider: String,
     pub api_key: Option<String>,
+    /// Preferred model for the active provider
+    pub model: Option<String>,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            provider: "openai".to_string(),
+            provider: "openrouter".to_string(),
             api_key: None,
+            model: Some("openrouter/auto".to_string()),
         }
     }
 }
@@ -48,6 +51,15 @@ impl Settings {
         fs::write(&path, content)
             .with_context(|| format!("Failed to write config at {}", path.display()))?;
         Ok(())
+    }
+
+    pub fn init(force: bool) -> Result<()> {
+        let path = config_file_path()?;
+        if path.exists() && !force {
+            anyhow::bail!("Config already exists at {} (use --force to overwrite)", path.display());
+        }
+        let default = Self::default();
+        default.save()
     }
 }
 

@@ -9,6 +9,9 @@ pub struct Cli {
     #[command(flatten)]
     pub io: IoArgs,
 
+    #[command(flatten)]
+    pub runtime: RuntimeArgs,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }
@@ -22,6 +25,17 @@ pub struct IoArgs {
     /// Output file path
     #[arg(short = 'o', long = "output")]
     pub output_file: Option<String>,
+}
+
+#[derive(Args, Debug, Default)]
+pub struct RuntimeArgs {
+    /// Override provider for this run
+    #[arg(long = "provider")]
+    pub provider: Option<String>,
+
+    /// Override model for this run
+    #[arg(long = "model")]
+    pub model: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -51,6 +65,12 @@ pub enum Commands {
 
 #[derive(Subcommand, Debug)]
 pub enum ConfigAction {
+    /// Initialize default config file (~/.spark_cli/config.toml)
+    Init {
+        /// Overwrite if exists
+        #[arg(long)]
+        force: bool,
+    },
     Set { key: String, value: String },
     List,
 }

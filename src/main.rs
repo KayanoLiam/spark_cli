@@ -26,9 +26,13 @@ async fn main() -> Result<()> {
             } else {
                 None
             };
-            cli::commands::handle_chat(&settings, prompt).await?
+            cli::commands::handle_chat(&settings, prompt, &cli.runtime).await?
         }
         Some(Commands::Config { action }) => match action {
+            ConfigAction::Init { force } => {
+                Settings::init(*force)?;
+                println!("Initialized config at ~/.spark_cli/config.toml");
+            }
             ConfigAction::List => cli::commands::handle_config_list(&settings).await?,
             ConfigAction::Set { key, value } => {
                 cli::commands::handle_config_set(&mut settings, key, value).await?
@@ -60,7 +64,7 @@ async fn main() -> Result<()> {
         None => {
             if !cli.prompt.is_empty() {
                 let prompt = cli.prompt.join(" ");
-                cli::commands::handle_chat(&settings, Some(prompt)).await?
+                cli::commands::handle_chat(&settings, Some(prompt), &cli.runtime).await?
             } else {
                 // No command and no prompt: show help
                 Cli::command().print_help()?;
