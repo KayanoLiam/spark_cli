@@ -8,6 +8,7 @@ const APP_DIR_NAME: &str = ".spark_cli";
 pub const CONFIG_FILE_NAME: &str = "config.toml";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Settings {
     pub provider: String,
     pub api_key: Option<String>,
@@ -15,6 +16,10 @@ pub struct Settings {
     pub model: Option<String>,
     /// Base URL for OpenAI-compatible providers (DeepSeek/Qwen/OpenAI proxy)
     pub base_url: Option<String>,
+    /// Automatically extract and write code blocks from responses
+    pub auto_code_write: bool,
+    /// Default directory for auto-written code (relative to project root)
+    pub output_dir: Option<String>,
 }
 
 impl Default for Settings {
@@ -24,6 +29,8 @@ impl Default for Settings {
             api_key: None,
             model: Some("openrouter/auto".to_string()),
             base_url: None,
+            auto_code_write: true,
+            output_dir: Some("generated".to_string()),
         }
     }
 }
