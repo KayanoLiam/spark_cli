@@ -146,7 +146,7 @@ pub async fn handle_session_delete(_settings: &Settings, id: &str) -> Result<()>
     Ok(())
 }
 
-pub async fn handle_code_generate(settings: &Settings, lang: &str, kind: &str, runtime: &RuntimeArgs, io: &IoArgs, http: &Client) -> Result<()> {
+pub async fn handle_code_generate(settings: &Settings, lang: &str, kind: &str, runtime: &RuntimeArgs, io: &IoArgs, http: &Client, code_only: bool, out_dir: &Option<String>) -> Result<()> {
     let api_key = settings
         .api_key
         .as_deref()
@@ -174,6 +174,33 @@ pub async fn handle_code_generate(settings: &Settings, lang: &str, kind: &str, r
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
     let content = or_chat(http, &api_key, messages, model).await?;
     pb.finish_and_clear();
+
+    // Post-process content
+    if code_only || out_dir.is_some() {
+        use crate::utils::code::{extract_code_blocks, choose_best_block, guess_ext_from_lang};
+        let blocks = extract_code_blocks(&content);
+        if let Some(dir) = out_dir {
+            // write each block into dir, filename or fallback
+            std::fs::create_dir_all(dir)?;
+            for (idx, b) in blocks.iter().enumerate() {
+                let filename = b.filename.clone().unwrap_or_else(|| {
+                    let ext = b.language.as_deref().map(guess_ext_from_lang).unwrap_or("txt");
+                    format!("snippet_{}.{}", idx + 1, ext)
+                });
+                let path = std::path::Path::new(dir).join(filename);
+                std::fs::write(&path, &b.content)?;
+            }
+            println!("Wrote {} code blocks to {}", blocks.len(), dir);
+            return Ok(());
+        } else {
+            // choose best by language
+            let preferred = [lang];
+            if let Some(b) = choose_best_block(&blocks, &preferred) {
+                if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &b.content)?; } else { println!("{}", b.content); }
+                return Ok(());
+            }
+        }
+    }
 
     if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
     println!("{}", content);

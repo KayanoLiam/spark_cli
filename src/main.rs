@@ -20,9 +20,14 @@ async fn main() -> Result<()> {
     let project_root = std::env::current_dir().ok();
     let mut settings = Settings::load_with(project_root.as_deref(), explicit_path)?;
 
+    // Shared HTTP client with timeout
+    let http = reqwest::Client::builder()
+        .pool_max_idle_per_host(8)
+        .timeout(std::time::Duration::from_secs(60))
+        .build()?;
+
     match &cli.command {
         Some(Commands::Interactive) => {
-            let http = reqwest::Client::new();
             cli::commands::handle_interactive(&settings, &cli.runtime, &cli.io, &http).await?
         }
         Some(Commands::Chat) => {
@@ -31,7 +36,6 @@ async fn main() -> Result<()> {
             } else {
                 None
             };
-            let http = reqwest::Client::new();
             cli::commands::handle_chat(&settings, prompt, &cli.runtime, &cli.io, &http).await?
         }
         Some(Commands::Config { action }) => match action {
@@ -66,23 +70,19 @@ async fn main() -> Result<()> {
             }
         },
         Some(Commands::Code { action }) => match action {
-            CodeAction::Generate { lang, r#type } => {
-                let http = reqwest::Client::new();
-                cli::commands::handle_code_generate(&settings, lang, r#type, &cli.runtime, &cli.io, &http).await?
+            CodeAction::Generate { lang, r#type, code_only, out_dir } => {
+                cli::commands::handle_code_generate(&settings, lang, r#type, &cli.runtime, &cli.io, &http, *code_only, out_dir).await?
             }
             CodeAction::Review { file } => {
-                let http = reqwest::Client::new();
                 cli::commands::handle_code_review(&settings, file, &cli.runtime, &cli.io, &http).await?
             }
             CodeAction::Optimize { file } => {
-                let http = reqwest::Client::new();
                 cli::commands::handle_code_optimize(&settings, file, &cli.runtime, &cli.io, &http).await?
             }
         },
         None => {
             if !cli.prompt.is_empty() {
                 let prompt = cli.prompt.join(" ");
-                let http = reqwest::Client::new();
                 cli::commands::handle_chat(&settings, Some(prompt), &cli.runtime, &cli.io, &http).await?
             } else {
                 // No command and no prompt: show help

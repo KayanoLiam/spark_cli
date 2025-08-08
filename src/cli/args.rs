@@ -100,7 +100,13 @@ pub enum CodeAction {
         #[arg(long)]
         lang: String, 
         #[arg(long = "type")]
-        r#type: String 
+        r#type: String,
+        /// Only output code blocks (strip explanations)
+        #[arg(long = "code-only")]
+        code_only: bool,
+        /// When multiple blocks exist, write them into this directory
+        #[arg(long = "out-dir")]
+        out_dir: Option<String>,
     },
     Review { file: String },
     Optimize { file: String },

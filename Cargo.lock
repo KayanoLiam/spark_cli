@@ -1326,6 +1326,7 @@ dependencies = [
  "dirs",
  "futures-util",
  "indicatif",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",
