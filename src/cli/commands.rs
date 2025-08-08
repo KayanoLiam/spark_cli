@@ -66,8 +66,12 @@ pub async fn handle_chat(settings: &Settings, prompt: Option<String>, runtime: &
             let pb = ProgressBar::new_spinner().with_message("Contacting OpenRouter...");
             pb.set_style(ProgressStyle::with_template("{spinner} {msg}").unwrap());
             pb.enable_steady_tick(std::time::Duration::from_millis(100));
-            let content = or_chat(client, &api_key, messages, model).await?;
+            let result = or_chat(client, &api_key, messages, model).await;
             pb.finish_and_clear();
+            let content = match result {
+                Ok(c) => c,
+                Err(e) => { eprintln!("{}", style(format!("Request failed: {}", e)).red()); return Err(e); }
+            };
             // append to session if any
             let mgr = SessionManager::new();
             if let Some(sid) = mgr.current_session_id() {
@@ -76,7 +80,7 @@ pub async fn handle_chat(settings: &Settings, prompt: Option<String>, runtime: &
                 mgr.append_message(&sid, &MessageRecord { role: "assistant".into(), content: content.clone(), timestamp_ms: now })?;
             }
             // write to file if requested
-            if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
+            if let Some(out) = &io.output_file { if let Err(e) = crate::utils::io::write_string(out, &content) { eprintln!("{}", style(format!("Failed to write output: {}", e)).red()); } }
             println!("{}", content);
             return Ok(());
         }
@@ -158,7 +162,9 @@ pub async fn handle_code_generate(settings: &Settings, lang: &str, kind: &str, r
     let provider = runtime.provider.as_deref().unwrap_or(&settings.provider);
     let model = runtime.model.as_deref().or(settings.model.as_deref());
 
-    if provider.to_lowercase() != "openrouter" { println!("{}", style("Only OpenRouter is supported for now").yellow()); }
+    if provider.to_lowercase() != "openrouter" {
+        eprintln!("{}", style("Only OpenRouter is supported for now; using OpenRouter instead").yellow());
+    }
 
     let system = format!(
         "你是资深软件工程师。请用 {} 实现一个 {} 的最小可运行示例，包含清晰注释与依赖说明。若涉及多文件，整合为单文件展示。",
@@ -231,7 +237,15 @@ pub async fn handle_code_review(settings: &Settings, file: &str, runtime: &Runti
         let pb = ProgressBar::new_spinner().with_message("Reviewing...");
         pb.set_style(ProgressStyle::with_template("{spinner} {msg}").unwrap());
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
-        let r = or_chat(http, &api_key, messages, model).await?; pb.finish_and_clear(); r
+        let r = or_chat(http, &api_key, messages, model).await;
+        pb.finish_and_clear();
+        match r {
+            Ok(x) => x,
+            Err(e) => {
+                eprintln!("{}", style(format!("Review failed: {}", e)).red());
+                return Err(e);
+            }
+        }
     };
     if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
     if !runtime.stream { println!("{}", content); }

@@ -1,10 +1,17 @@
-use anyhow::Result;
-use std::fs;
+use anyhow::{Context, Result};
+use std::{fs, path::Path};
 
 pub fn read_to_string(path: &str) -> Result<String> {
-    Ok(fs::read_to_string(path)?)
+    fs::read_to_string(path).with_context(|| format!("Failed to read file: {}", path))
 }
 
 pub fn write_string(path: &str, content: &str) -> Result<()> {
-    Ok(fs::write(path, content)?)
+    let p = Path::new(path);
+    if let Some(parent) = p.parent() {
+        if !parent.as_os_str().is_empty() && !parent.exists() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create parent directory: {}", parent.display()))?;
+        }
+    }
+    fs::write(p, content).with_context(|| format!("Failed to write file: {}", p.display()))
 }

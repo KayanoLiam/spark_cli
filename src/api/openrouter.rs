@@ -47,7 +47,8 @@ pub async fn chat_complete(
         .headers(headers)
         .json(&req)
         .send()
-        .await?;
+        .await
+        .map_err(|e| anyhow!("Network error: {}", e))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
@@ -90,7 +91,8 @@ pub async fn chat_complete_stream<F: FnMut(&str)>(
         .headers(headers)
         .json(&req)
         .send()
-        .await?;
+        .await
+        .map_err(|e| anyhow!("Network error: {}", e))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
