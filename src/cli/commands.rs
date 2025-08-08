@@ -4,6 +4,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::api::models::ChatMessage;
 use crate::api::openrouter::{chat_complete as or_chat, chat_complete_stream as or_chat_stream};
+use crate::api::openai_compat::{chat_complete as oa_chat, chat_complete_stream as oa_chat_stream};
 use reqwest::Client;
 use crate::config::settings::Settings;
 use crate::cli::args::{RuntimeArgs, IoArgs};
@@ -86,7 +87,42 @@ pub async fn handle_chat(settings: &Settings, prompt: Option<String>, runtime: &
         }
     }
 
-    println!("{}", style("Selected provider not supported yet; falling back to OpenRouter").yellow());
+    // OpenAI-compatible providers: deepseek, qwen, openai, custom proxy
+    if matches!(provider.to_lowercase().as_str(), "deepseek" | "qwen" | "openai" | "openai-compatible") {
+        let base = settings.base_url.as_deref().ok_or_else(|| anyhow!("Missing base_url in config for OpenAI-compatible provider"))?;
+        let messages = vec![ChatMessage { role: "user".to_string(), content: prompt.clone() }];
+        if runtime.stream {
+            let mut buffer = String::new();
+            let content = oa_chat_stream(http, base, &api_key, messages, model, |chunk| { print!("{}", chunk); let _ = std::io::Write::flush(&mut std::io::stdout()); buffer.push_str(chunk); }).await?;
+            println!();
+            let final_text = if content.is_empty() { buffer } else { content };
+            let mgr = SessionManager::new();
+            if let Some(sid) = mgr.current_session_id() {
+                let now = chrono::Utc::now().timestamp_millis();
+                mgr.append_message(&sid, &MessageRecord { role: "user".into(), content: prompt.clone(), timestamp_ms: now })?;
+                mgr.append_message(&sid, &MessageRecord { role: "assistant".into(), content: final_text.clone(), timestamp_ms: now })?;
+            }
+            if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &final_text)?; }
+            return Ok(());
+        } else {
+            let pb = ProgressBar::new_spinner().with_message("Contacting provider...");
+            pb.set_style(ProgressStyle::with_template("{spinner} {msg}").unwrap());
+            pb.enable_steady_tick(std::time::Duration::from_millis(100));
+            let content = oa_chat(http, base, &api_key, messages, model).await?;
+            pb.finish_and_clear();
+            let mgr = SessionManager::new();
+            if let Some(sid) = mgr.current_session_id() {
+                let now = chrono::Utc::now().timestamp_millis();
+                mgr.append_message(&sid, &MessageRecord { role: "user".into(), content: prompt.clone(), timestamp_ms: now })?;
+                mgr.append_message(&sid, &MessageRecord { role: "assistant".into(), content: content.clone(), timestamp_ms: now })?;
+            }
+            if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
+            println!("{}", content);
+            return Ok(());
+        }
+    }
+
+    eprintln!("{}", style("Selected provider not supported yet; falling back to OpenRouter").yellow());
     let messages = vec![ChatMessage { role: "user".to_string(), content: prompt.clone() }];
     let client = http;
     let content = or_chat(client, &api_key, messages, None).await?;

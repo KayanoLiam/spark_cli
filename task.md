@@ -85,6 +85,7 @@ mycli code optimize --file src/lib.rs
 - Google (Gemini)
 - 本地模型 (Ollama)
 - OpenRouter (已支持)
+- OpenAI 兼容（DeepSeek/Qwen/OpenAI proxy）(已支持)
 - 可扩展架构支持更多提供商
 
 ### 3. 配置系统
@@ -131,7 +132,7 @@ mycli code optimize --file src/lib.rs
 
 ### Phase 2: 核心功能
 - [x] 实现 API 交互逻辑（OpenRouter 文本对话）
-- [x] 添加多个 AI 服务提供商支持（已接入 OpenRouter）
+- [x] 添加多个 AI 服务提供商支持（OpenRouter + OpenAI 兼容接口）
 - [x] 实现会话管理（基础：创建/列出/切换/删除，CURRENT 追踪）
 - [x] 添加文件 I/O 功能（-f 输入文件，-o 输出文件）
 

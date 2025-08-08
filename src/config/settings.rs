@@ -13,6 +13,8 @@ pub struct Settings {
     pub api_key: Option<String>,
     /// Preferred model for the active provider
     pub model: Option<String>,
+    /// Base URL for OpenAI-compatible providers (DeepSeek/Qwen/OpenAI proxy)
+    pub base_url: Option<String>,
 }
 
 impl Default for Settings {
@@ -21,6 +23,7 @@ impl Default for Settings {
             provider: "openrouter".to_string(),
             api_key: None,
             model: Some("openrouter/auto".to_string()),
+            base_url: None,
         }
     }
 }
