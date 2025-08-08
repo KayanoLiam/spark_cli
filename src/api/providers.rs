@@ -4,6 +4,7 @@ pub enum Provider {
     Anthropic,
     Google,
     Ollama,
+    OpenRouter,
 }
 
 impl Provider {
@@ -13,7 +14,8 @@ impl Provider {
             "anthropic" => Self::Anthropic,
             "google" => Self::Google,
             "ollama" => Self::Ollama,
-            _ => Self::OpenAI,
+            "openrouter" => Self::OpenRouter,
+            _ => Self::OpenRouter,
         }
     }
 }

@@ -84,6 +84,7 @@ mycli code optimize --file src/lib.rs
 - Anthropic (Claude)
 - Google (Gemini)
 - 本地模型 (Ollama)
+- OpenRouter (已支持)
 - 可扩展架构支持更多提供商
 
 ### 3. 配置系统
@@ -130,7 +131,7 @@ mycli code optimize --file src/lib.rs
 
 ### Phase 2: 核心功能
 - [ ] 实现 API 交互逻辑
-- [ ] 添加多个 AI 服务提供商支持
+- [x] 添加多个 AI 服务提供商支持（已接入 OpenRouter）
 - [ ] 实现会话管理
 - [ ] 添加文件 I/O 功能
 

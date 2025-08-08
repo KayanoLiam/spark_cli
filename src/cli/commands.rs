@@ -1,6 +1,8 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use console::style;
 
+use crate::api::models::ChatMessage;
+use crate::api::openrouter::chat_complete as or_chat;
 use crate::config::settings::Settings;
 
 pub async fn handle_interactive(_settings: &Settings) -> Result<()> {
@@ -8,8 +10,31 @@ pub async fn handle_interactive(_settings: &Settings) -> Result<()> {
     Ok(())
 }
 
-pub async fn handle_chat(_settings: &Settings, _prompt: Option<String>) -> Result<()> {
-    println!("{}", style("[chat] not implemented yet").yellow());
+pub async fn handle_chat(settings: &Settings, prompt: Option<String>) -> Result<()> {
+    let prompt = match prompt {
+        Some(p) if !p.trim().is_empty() => p,
+        _ => return Err(anyhow!("Prompt is empty. Provide text or use interactive/chat mode.")),
+    };
+
+    let api_key = settings
+        .api_key
+        .as_deref()
+        .ok_or_else(|| anyhow!("API key is not set. Use `config set api-key ...`"))?;
+
+    // For now we default to OpenRouter if user says they only have it
+    if settings.provider.to_lowercase() == "openrouter" || settings.provider.is_empty() {
+        let messages = vec![ChatMessage { role: "user".to_string(), content: prompt }];
+        let client = reqwest::Client::new();
+        let content = or_chat(&client, api_key, messages, None).await?;
+        println!("{}", content);
+        return Ok(());
+    }
+
+    println!("{}", style("Selected provider not supported yet; falling back to OpenRouter").yellow());
+    let messages = vec![ChatMessage { role: "user".to_string(), content: prompt }];
+    let client = reqwest::Client::new();
+    let content = or_chat(&client, api_key, messages, None).await?;
+    println!("{}", content);
     Ok(())
 }
 
