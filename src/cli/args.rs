@@ -19,11 +19,11 @@ pub struct Cli {
 #[derive(Args, Debug, Default)]
 pub struct IoArgs {
     /// Input file path
-    #[arg(short = 'f', long = "file")]
+    #[arg(short = 'f', long = "file", global = true)]
     pub input_file: Option<String>,
 
     /// Output file path
-    #[arg(short = 'o', long = "output")]
+    #[arg(short = 'o', long = "output", global = true)]
     pub output_file: Option<String>,
 }
 
@@ -96,7 +96,12 @@ pub enum SessionAction {
 
 #[derive(Subcommand, Debug)]
 pub enum CodeAction {
-    Generate { lang: String, r#type: String },
+    Generate { 
+        #[arg(long)]
+        lang: String, 
+        #[arg(long = "type")]
+        r#type: String 
+    },
     Review { file: String },
     Optimize { file: String },
 }
