@@ -1,1 +1,21 @@
 /target
+# Editors & OS
+.DS_Store
+*.swp
+*.log
+
+# Local configs and secrets
+config.toml
+*.local.toml
+*.env
+.env
+
+# Session data
+~/.spark_cli/
+sessions/
+
+# Generated artifacts
+*.out
+*.bin
+out/
+dist/
