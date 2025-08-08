@@ -1,16 +1,22 @@
 use anyhow::{anyhow, Result};
 use console::style;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use crate::api::models::ChatMessage;
-use crate::api::openrouter::chat_complete as or_chat;
+use crate::api::openrouter::{chat_complete as or_chat, chat_complete_stream as or_chat_stream};
 use crate::config::settings::Settings;
 use crate::cli::args::{RuntimeArgs, IoArgs};
 use crate::session::manager::SessionManager;
 use crate::session::history::MessageRecord;
 
-pub async fn handle_interactive(_settings: &Settings) -> Result<()> {
-    println!("{}", style("[interactive] not implemented yet").yellow());
-    Ok(())
+pub async fn handle_interactive(settings: &Settings, runtime: &RuntimeArgs, io: &IoArgs) -> Result<()> {
+    use dialoguer::Input;
+    println!("{}", style("Interactive mode. Ctrl+C to exit.").cyan());
+    loop {
+        let line: String = Input::new().with_prompt("You").interact_text()?;
+        if line.trim().is_empty() { continue; }
+        handle_chat(settings, Some(line), runtime, io).await?;
+    }
 }
 
 pub async fn handle_chat(settings: &Settings, prompt: Option<String>, runtime: &RuntimeArgs, io: &IoArgs) -> Result<()> {
@@ -37,18 +43,42 @@ pub async fn handle_chat(settings: &Settings, prompt: Option<String>, runtime: &
     if provider.to_lowercase() == "openrouter" || provider.is_empty() {
         let messages = vec![ChatMessage { role: "user".to_string(), content: prompt.clone() }];
         let client = reqwest::Client::new();
-        let content = or_chat(&client, &api_key, messages, model).await?;
-        // append to session if any
-        let mgr = SessionManager::new();
-        if let Some(sid) = mgr.current_session_id() {
-            let now = chrono::Utc::now().timestamp_millis();
-            mgr.append_message(&sid, &MessageRecord { role: "user".into(), content: prompt.clone(), timestamp_ms: now })?;
-            mgr.append_message(&sid, &MessageRecord { role: "assistant".into(), content: content.clone(), timestamp_ms: now })?;
+        if runtime.stream {
+            let mut buffer = String::new();
+            let content = or_chat_stream(&client, &api_key, messages, model, |chunk| {
+                print!("{}", chunk);
+                let _ = std::io::Write::flush(&mut std::io::stdout());
+                buffer.push_str(chunk);
+            }).await?;
+            // newline after stream
+            println!();
+            let final_text = if content.is_empty() { buffer } else { content };
+            let mgr = SessionManager::new();
+            if let Some(sid) = mgr.current_session_id() {
+                let now = chrono::Utc::now().timestamp_millis();
+                mgr.append_message(&sid, &MessageRecord { role: "user".into(), content: prompt.clone(), timestamp_ms: now })?;
+                mgr.append_message(&sid, &MessageRecord { role: "assistant".into(), content: final_text.clone(), timestamp_ms: now })?;
+            }
+            if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &final_text)?; }
+            return Ok(());
+        } else {
+            let pb = ProgressBar::new_spinner().with_message("Contacting OpenRouter...");
+            pb.set_style(ProgressStyle::with_template("{spinner} {msg}").unwrap());
+            pb.enable_steady_tick(std::time::Duration::from_millis(100));
+            let content = or_chat(&client, &api_key, messages, model).await?;
+            pb.finish_and_clear();
+            // append to session if any
+            let mgr = SessionManager::new();
+            if let Some(sid) = mgr.current_session_id() {
+                let now = chrono::Utc::now().timestamp_millis();
+                mgr.append_message(&sid, &MessageRecord { role: "user".into(), content: prompt.clone(), timestamp_ms: now })?;
+                mgr.append_message(&sid, &MessageRecord { role: "assistant".into(), content: content.clone(), timestamp_ms: now })?;
+            }
+            // write to file if requested
+            if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
+            println!("{}", content);
+            return Ok(());
         }
-        // write to file if requested
-        if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
-        println!("{}", content);
-        return Ok(());
     }
 
     println!("{}", style("Selected provider not supported yet; falling back to OpenRouter").yellow());

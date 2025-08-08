@@ -136,9 +136,9 @@ mycli code optimize --file src/lib.rs
 - [x] 添加文件 I/O 功能（-f 输入文件，-o 输出文件）
 
 ### Phase 3: 用户体验
-- [ ] 实现交互模式
-- [ ] 添加进度指示和彩色输出
-- [ ] 实现流式响应显示
+- [x] 实现交互模式（基础文本循环）
+- [x] 添加进度指示和彩色输出（spinner + console）
+- [x] 实现流式响应显示（OpenRouter SSE）
 - [ ] 优化错误处理和用户反馈
 
 ### Phase 4: 高级功能

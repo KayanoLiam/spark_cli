@@ -37,6 +37,10 @@ pub struct RuntimeArgs {
     #[arg(long = "model")]
     pub model: Option<String>,
 
+    /// Stream output if provider supports
+    #[arg(long = "stream")]
+    pub stream: bool,
+
     /// Explicit config file path
     #[arg(long = "config")]
     pub config: Option<String>,

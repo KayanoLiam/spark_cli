@@ -22,7 +22,7 @@ async fn main() -> Result<()> {
 
     match &cli.command {
         Some(Commands::Interactive) => {
-            cli::commands::handle_interactive(&settings).await?
+            cli::commands::handle_interactive(&settings, &cli.runtime, &cli.io).await?
         }
         Some(Commands::Chat) => {
             let prompt = if !cli.prompt.is_empty() {
