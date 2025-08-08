@@ -16,16 +16,20 @@ pub async fn handle_chat(settings: &Settings, prompt: Option<String>) -> Result<
         _ => return Err(anyhow!("Prompt is empty. Provide text or use interactive/chat mode.")),
     };
 
+    // Resolve API key: config first, then env OPENROUTER_API_KEY
     let api_key = settings
         .api_key
         .as_deref()
-        .ok_or_else(|| anyhow!("API key is not set. Use `config set api-key ...`"))?;
+        .map(|s| s.to_string())
+        .or_else(|| std::env::var("OPENROUTER_API_KEY").ok())
+        .ok_or_else(|| anyhow!("API key is not set. Use `config set api-key ...` or set env OPENROUTER_API_KEY"))?;
+    let api_key = crate::utils::secrets::normalize_api_key(&api_key);
 
     // For now we default to OpenRouter if user says they only have it
     if settings.provider.to_lowercase() == "openrouter" || settings.provider.is_empty() {
         let messages = vec![ChatMessage { role: "user".to_string(), content: prompt }];
         let client = reqwest::Client::new();
-        let content = or_chat(&client, api_key, messages, None).await?;
+        let content = or_chat(&client, &api_key, messages, None).await?;
         println!("{}", content);
         return Ok(());
     }
@@ -33,7 +37,7 @@ pub async fn handle_chat(settings: &Settings, prompt: Option<String>) -> Result<
     println!("{}", style("Selected provider not supported yet; falling back to OpenRouter").yellow());
     let messages = vec![ChatMessage { role: "user".to_string(), content: prompt }];
     let client = reqwest::Client::new();
-    let content = or_chat(&client, api_key, messages, None).await?;
+    let content = or_chat(&client, &api_key, messages, None).await?;
     println!("{}", content);
     Ok(())
 }

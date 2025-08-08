@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE, HeaderMap, HeaderValue};
 use serde::{Deserialize, Serialize};
 
 use crate::api::models::{ChatMessage, ChatRequest};
@@ -37,12 +37,22 @@ pub async fn chat_complete(
         stream: None,
     };
 
+    // Build headers per OpenRouter docs
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", api_key))?,
+    );
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    headers.insert(
+        "HTTP-Referer",
+        HeaderValue::from_static("https://github.com/your-org/spark_cli"),
+    );
+    headers.insert("X-Title", HeaderValue::from_static("spark_cli"));
+
     let resp = client
         .post(DEFAULT_ENDPOINT)
-        .header(AUTHORIZATION, format!("Bearer {}", api_key))
-        .header(CONTENT_TYPE, "application/json")
-        // Optional but recommended headers for OpenRouter
-        .header("X-Title", "spark_cli")
+        .headers(headers)
         .json(&req)
         .send()
         .await?;
