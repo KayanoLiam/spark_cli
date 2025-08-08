@@ -198,23 +198,24 @@ pub async fn handle_code_generate(settings: &Settings, lang: &str, kind: &str, r
     let provider = runtime.provider.as_deref().unwrap_or(&settings.provider);
     let model = runtime.model.as_deref().or(settings.model.as_deref());
 
-    if provider.to_lowercase() != "openrouter" {
-        eprintln!("{}", style("Only OpenRouter is supported for now; using OpenRouter instead").yellow());
-    }
-
     let system = format!(
-        "你是资深软件工程师。请用 {} 实现一个 {} 的最小可运行示例，包含清晰注释与依赖说明。若涉及多文件，整合为单文件展示。",
+        "You are a senior software engineer. Create a minimal, runnable example in {} for a {}. Include clear comments and dependency instructions. If multiple files are required, consolidate into a single-file presentation.",
         lang, kind
     );
     let messages = vec![
         ChatMessage { role: "system".into(), content: system },
-        ChatMessage { role: "user".into(), content: "请给出代码实现，并简单说明使用方式。".into() },
+        ChatMessage { role: "user".into(), content: "Provide the implementation and a brief usage guide.".into() },
     ];
 
     let pb = ProgressBar::new_spinner().with_message("Generating code...");
     pb.set_style(ProgressStyle::with_template("{spinner} {msg}").unwrap());
     pb.enable_steady_tick(std::time::Duration::from_millis(100));
-    let content = or_chat(http, &api_key, messages, model).await?;
+    let content = if matches!(provider.to_lowercase().as_str(), "deepseek" | "qwen" | "openai" | "openai-compatible") {
+        let base = settings.base_url.as_deref().ok_or_else(|| anyhow!("Missing base_url in config for OpenAI-compatible provider"))?;
+        oa_chat(http, base, &api_key, messages, model).await?
+    } else {
+        or_chat(http, &api_key, messages, model).await?
+    };
     pb.finish_and_clear();
 
     // Post-process content
@@ -260,20 +261,28 @@ pub async fn handle_code_review(settings: &Settings, file: &str, runtime: &Runti
 
     let provider = runtime.provider.as_deref().unwrap_or(&settings.provider);
     let model = runtime.model.as_deref().or(settings.model.as_deref());
-    if provider.to_lowercase() != "openrouter" { println!("{}", style("Only OpenRouter is supported for now").yellow()); }
-
     let code = crate::utils::io::read_to_string(file)?;
     let messages = vec![
-        ChatMessage { role: "system".into(), content: "你是一位严格且友善的代码审查专家，请指出问题、风险与改进建议，必要时给出重构示例。".into() },
-        ChatMessage { role: "user".into(), content: format!("请审查以下代码文件 {}:\n\n```\n{}\n```", file, code) },
+        ChatMessage { role: "system".into(), content: "You are a rigorous and friendly code reviewer. Identify issues, risks, and improvements, and provide refactoring examples when necessary.".into() },
+        ChatMessage { role: "user".into(), content: format!("Please review the following file {}:\n\n```\n{}\n```", file, code) },
     ];
     let content = if runtime.stream {
-        or_chat_stream(http, &api_key, messages, model, |chunk| { print!("{}", chunk); let _ = std::io::Write::flush(&mut std::io::stdout()); }).await?
+        if matches!(provider.to_lowercase().as_str(), "deepseek" | "qwen" | "openai" | "openai-compatible") {
+            let base = settings.base_url.as_deref().ok_or_else(|| anyhow!("Missing base_url in config for OpenAI-compatible provider"))?;
+            oa_chat_stream(http, base, &api_key, messages, model, |chunk| { print!("{}", chunk); let _ = std::io::Write::flush(&mut std::io::stdout()); }).await?
+        } else {
+            or_chat_stream(http, &api_key, messages, model, |chunk| { print!("{}", chunk); let _ = std::io::Write::flush(&mut std::io::stdout()); }).await?
+        }
     } else {
         let pb = ProgressBar::new_spinner().with_message("Reviewing...");
         pb.set_style(ProgressStyle::with_template("{spinner} {msg}").unwrap());
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
-        let r = or_chat(http, &api_key, messages, model).await;
+        let r = if matches!(provider.to_lowercase().as_str(), "deepseek" | "qwen" | "openai" | "openai-compatible") {
+            let base = settings.base_url.as_deref().ok_or_else(|| anyhow!("Missing base_url in config for OpenAI-compatible provider"))?;
+            oa_chat(http, base, &api_key, messages, model).await
+        } else {
+            or_chat(http, &api_key, messages, model).await
+        };
         pb.finish_and_clear();
         match r {
             Ok(x) => x,
@@ -299,20 +308,30 @@ pub async fn handle_code_optimize(settings: &Settings, file: &str, runtime: &Run
 
     let provider = runtime.provider.as_deref().unwrap_or(&settings.provider);
     let model = runtime.model.as_deref().or(settings.model.as_deref());
-    if provider.to_lowercase() != "openrouter" { println!("{}", style("Only OpenRouter is supported for now").yellow()); }
-
     let code = crate::utils::io::read_to_string(file)?;
     let messages = vec![
-        ChatMessage { role: "system".into(), content: "你是资深性能优化工程师，请在不改变语义的前提下优化性能、可读性与错误处理，尽量给出逐段的修改建议与最终重构版。".into() },
-        ChatMessage { role: "user".into(), content: format!("请优化以下代码 {}:\n\n```\n{}\n```", file, code) },
+        ChatMessage { role: "system".into(), content: "You are a senior performance engineer. Optimize performance, readability, and error handling without changing semantics. Provide step-by-step suggestions and a final refactored version.".into() },
+        ChatMessage { role: "user".into(), content: format!("Please optimize the following code {}:\n\n```\n{}\n```", file, code) },
     ];
     let content = if runtime.stream {
-        or_chat_stream(http, &api_key, messages, model, |chunk| { print!("{}", chunk); let _ = std::io::Write::flush(&mut std::io::stdout()); }).await?
+        if matches!(provider.to_lowercase().as_str(), "deepseek" | "qwen" | "openai" | "openai-compatible") {
+            let base = settings.base_url.as_deref().ok_or_else(|| anyhow!("Missing base_url in config for OpenAI-compatible provider"))?;
+            oa_chat_stream(http, base, &api_key, messages, model, |chunk| { print!("{}", chunk); let _ = std::io::Write::flush(&mut std::io::stdout()); }).await?
+        } else {
+            or_chat_stream(http, &api_key, messages, model, |chunk| { print!("{}", chunk); let _ = std::io::Write::flush(&mut std::io::stdout()); }).await?
+        }
     } else {
         let pb = ProgressBar::new_spinner().with_message("Optimizing...");
         pb.set_style(ProgressStyle::with_template("{spinner} {msg}").unwrap());
         pb.enable_steady_tick(std::time::Duration::from_millis(100));
-        let r = or_chat(http, &api_key, messages, model).await?; pb.finish_and_clear(); r
+        let r = if matches!(provider.to_lowercase().as_str(), "deepseek" | "qwen" | "openai" | "openai-compatible") {
+            let base = settings.base_url.as_deref().ok_or_else(|| anyhow!("Missing base_url in config for OpenAI-compatible provider"))?;
+            oa_chat(http, base, &api_key, messages, model).await
+        } else {
+            or_chat(http, &api_key, messages, model).await
+        };
+        pb.finish_and_clear();
+        match r { Ok(x) => x, Err(e) => { eprintln!("{}", style(format!("Optimize failed: {}", e)).red()); return Err(e); } }
     };
     if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
     if !runtime.stream { println!("{}", content); }
