@@ -4,16 +4,20 @@ use console::style;
 use crate::api::models::ChatMessage;
 use crate::api::openrouter::chat_complete as or_chat;
 use crate::config::settings::Settings;
-use crate::cli::args::RuntimeArgs;
+use crate::cli::args::{RuntimeArgs, IoArgs};
+use crate::session::manager::SessionManager;
+use crate::session::history::MessageRecord;
 
 pub async fn handle_interactive(_settings: &Settings) -> Result<()> {
     println!("{}", style("[interactive] not implemented yet").yellow());
     Ok(())
 }
 
-pub async fn handle_chat(settings: &Settings, prompt: Option<String>, runtime: &RuntimeArgs) -> Result<()> {
-    let prompt = match prompt {
-        Some(p) if !p.trim().is_empty() => p,
+pub async fn handle_chat(settings: &Settings, prompt: Option<String>, runtime: &RuntimeArgs, io: &IoArgs) -> Result<()> {
+    // Prefer file input if provided
+    let prompt = match (&io.input_file, &prompt) {
+        (Some(path), _) => crate::utils::io::read_to_string(path)?.trim().to_string(),
+        (None, Some(p)) if !p.trim().is_empty() => p.to_string(),
         _ => return Err(anyhow!("Prompt is empty. Provide text or use interactive/chat mode.")),
     };
 
@@ -31,17 +35,33 @@ pub async fn handle_chat(settings: &Settings, prompt: Option<String>, runtime: &
     let model = runtime.model.as_deref().or(settings.model.as_deref());
 
     if provider.to_lowercase() == "openrouter" || provider.is_empty() {
-        let messages = vec![ChatMessage { role: "user".to_string(), content: prompt }];
+        let messages = vec![ChatMessage { role: "user".to_string(), content: prompt.clone() }];
         let client = reqwest::Client::new();
         let content = or_chat(&client, &api_key, messages, model).await?;
+        // append to session if any
+        let mgr = SessionManager::new();
+        if let Some(sid) = mgr.current_session_id() {
+            let now = chrono::Utc::now().timestamp_millis();
+            mgr.append_message(&sid, &MessageRecord { role: "user".into(), content: prompt.clone(), timestamp_ms: now })?;
+            mgr.append_message(&sid, &MessageRecord { role: "assistant".into(), content: content.clone(), timestamp_ms: now })?;
+        }
+        // write to file if requested
+        if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
         println!("{}", content);
         return Ok(());
     }
 
     println!("{}", style("Selected provider not supported yet; falling back to OpenRouter").yellow());
-    let messages = vec![ChatMessage { role: "user".to_string(), content: prompt }];
+    let messages = vec![ChatMessage { role: "user".to_string(), content: prompt.clone() }];
     let client = reqwest::Client::new();
     let content = or_chat(&client, &api_key, messages, None).await?;
+    let mgr = SessionManager::new();
+    if let Some(sid) = mgr.current_session_id() {
+        let now = chrono::Utc::now().timestamp_millis();
+        mgr.append_message(&sid, &MessageRecord { role: "user".into(), content: prompt, timestamp_ms: now })?;
+        mgr.append_message(&sid, &MessageRecord { role: "assistant".into(), content: content.clone(), timestamp_ms: now })?;
+    }
+    if let Some(out) = &io.output_file { crate::utils::io::write_string(out, &content)?; }
     println!("{}", content);
     Ok(())
 }
@@ -63,22 +83,35 @@ pub async fn handle_config_set(settings: &mut Settings, key: &str, value: &str) 
 }
 
 pub async fn handle_session_new(_settings: &Settings, name: &str) -> Result<()> {
-    println!("Create session: {} (not implemented)", name);
+    let mgr = SessionManager::new();
+    let id = mgr.create_session(name)?;
+    mgr.set_current_session_id(&id)?;
+    println!("Created session {} -> {}", name, id);
     Ok(())
 }
 
 pub async fn handle_session_list(_settings: &Settings) -> Result<()> {
-    println!("List sessions (not implemented)");
+    let mgr = SessionManager::new();
+    let list = mgr.list_sessions()?;
+    let current = mgr.current_session_id();
+    for meta in list {
+        let mark = if current.as_deref() == Some(&meta.id) { "*" } else { " " };
+        println!("{} {} - {}", mark, meta.id, meta.name);
+    }
     Ok(())
 }
 
 pub async fn handle_session_load(_settings: &Settings, id: &str) -> Result<()> {
-    println!("Load session {} (not implemented)", id);
+    let mgr = SessionManager::new();
+    mgr.set_current_session_id(id)?;
+    println!("Switched to session {}", id);
     Ok(())
 }
 
 pub async fn handle_session_delete(_settings: &Settings, id: &str) -> Result<()> {
-    println!("Delete session {} (not implemented)", id);
+    let mgr = SessionManager::new();
+    mgr.delete_session(id)?;
+    println!("Deleted session {}", id);
     Ok(())
 }
 

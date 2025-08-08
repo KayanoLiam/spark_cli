@@ -132,8 +132,8 @@ mycli code optimize --file src/lib.rs
 ### Phase 2: 核心功能
 - [x] 实现 API 交互逻辑（OpenRouter 文本对话）
 - [x] 添加多个 AI 服务提供商支持（已接入 OpenRouter）
-- [ ] 实现会话管理
-- [ ] 添加文件 I/O 功能
+- [x] 实现会话管理（基础：创建/列出/切换/删除，CURRENT 追踪）
+- [x] 添加文件 I/O 功能（-f 输入文件，-o 输出文件）
 
 ### Phase 3: 用户体验
 - [ ] 实现交互模式

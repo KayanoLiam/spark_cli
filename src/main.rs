@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
             } else {
                 None
             };
-            cli::commands::handle_chat(&settings, prompt, &cli.runtime).await?
+            cli::commands::handle_chat(&settings, prompt, &cli.runtime, &cli.io).await?
         }
         Some(Commands::Config { action }) => match action {
             ConfigAction::Init { force, scope } => {
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
         None => {
             if !cli.prompt.is_empty() {
                 let prompt = cli.prompt.join(" ");
-                cli::commands::handle_chat(&settings, Some(prompt), &cli.runtime).await?
+                cli::commands::handle_chat(&settings, Some(prompt), &cli.runtime, &cli.io).await?
             } else {
                 // No command and no prompt: show help
                 Cli::command().print_help()?;

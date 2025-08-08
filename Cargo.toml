@@ -17,3 +17,4 @@ dialoguer = "0.11"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 toml = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
