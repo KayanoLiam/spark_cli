@@ -36,6 +36,10 @@ pub struct RuntimeArgs {
     /// Override model for this run
     #[arg(long = "model")]
     pub model: Option<String>,
+
+    /// Explicit config file path
+    #[arg(long = "config")]
+    pub config: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -70,6 +74,9 @@ pub enum ConfigAction {
         /// Overwrite if exists
         #[arg(long)]
         force: bool,
+        /// Scope to create config: user or project (default: user)
+        #[arg(long, value_parser = ["user", "project"])]
+        scope: Option<String>,
     },
     Set { key: String, value: String },
     List,

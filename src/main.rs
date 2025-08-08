@@ -14,7 +14,11 @@ async fn main() -> Result<()> {
     init_tracing();
 
     let cli = Cli::parse();
-    let mut settings = Settings::load()?;
+    // Resolve explicit config path if provided
+    let explicit_path = cli.runtime.config.as_deref().map(std::path::Path::new);
+    // Project root: current working dir for project-scoped config
+    let project_root = std::env::current_dir().ok();
+    let mut settings = Settings::load_with(project_root.as_deref(), explicit_path)?;
 
     match &cli.command {
         Some(Commands::Interactive) => {
@@ -29,9 +33,18 @@ async fn main() -> Result<()> {
             cli::commands::handle_chat(&settings, prompt, &cli.runtime).await?
         }
         Some(Commands::Config { action }) => match action {
-            ConfigAction::Init { force } => {
-                Settings::init(*force)?;
-                println!("Initialized config at ~/.spark_cli/config.toml");
+            ConfigAction::Init { force, scope } => {
+                match scope.as_deref() {
+                    Some("project") => {
+                        let root = std::env::current_dir()?;
+                        Settings::init_scoped(*force, Some(&root))?;
+                        println!("Initialized project config at {}/{}", root.display(), config::settings::CONFIG_FILE_NAME);
+                    }
+                    _ => {
+                        Settings::init(*force)?;
+                        println!("Initialized user config at ~/.spark_cli/{}", config::settings::CONFIG_FILE_NAME);
+                    }
+                }
             }
             ConfigAction::List => cli::commands::handle_config_list(&settings).await?,
             ConfigAction::Set { key, value } => {
